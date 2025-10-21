@@ -1,0 +1,25 @@
+# Alpha Entry Bot - Docker Image
+
+FROM python:3.11.9-slim
+
+# Рабочая директория
+WORKDIR /app
+
+# Копируем зависимости
+COPY requirements.txt .
+
+# Устанавливаем зависимости
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копируем весь код
+COPY . .
+
+# Создаём директорию для БД
+RUN mkdir -p /app/data
+
+# Переменные окружения по умолчанию
+ENV DB_PATH=/app/data/bot.db
+ENV PYTHONUNBUFFERED=1
+
+# Запуск бота
+CMD ["python", "main.py"]

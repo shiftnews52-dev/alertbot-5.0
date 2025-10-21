@@ -1,0 +1,44 @@
+services:
+  # Alpha Entry Bot
+  - type: web
+    name: alpha-entry-bot
+    env: python
+    region: frankfurt  # Можешь выбрать: oregon, frankfurt, singapore
+    plan: free  # free, starter, standard, pro
+    
+    # Команда запуска
+    startCommand: "python main.py"
+    
+    # Build команда (автоматически)
+    buildCommand: "pip install -r requirements.txt"
+    
+    # Переменные окружения (настрой в Render Dashboard)
+    envVars:
+      - key: BOT_TOKEN
+        sync: false  # Укажешь вручную в Dashboard
+      
+      - key: ADMIN_IDS
+        sync: false
+      
+      - key: SUPPORT_URL
+        value: https://t.me/support
+      
+      - key: BOT_NAME
+        value: Alpha Entry Bot
+      
+      - key: DB_PATH
+        value: /opt/render/project/src/bot.db
+      
+      - key: PYTHON_VERSION
+        value: 3.11.9
+    
+    # Автоматический деплой
+    autoDeploy: true
+    
+    # Health check (опционально)
+    healthCheckPath: /
+
+# ВАЖНО: 
+# 1. SQLite на Render работает, НО данные удаляются при каждом деплое
+# 2. Для продакшена лучше использовать PostgreSQL (см. ниже)
+# 3. Free tier засыпает после 15 минут бездействия
