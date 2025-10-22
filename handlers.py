@@ -1,5 +1,5 @@
 """
-handlers.py - Обработчики команд и кнопок
+handlers.py - Обработчики команд и кнопок (с поддержкой картинок)
 """
 import time
 import asyncio
@@ -7,6 +7,7 @@ from aiogram import types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from config import ADMIN_IDS, SUPPORT_URL, t, BOT_NAME
+from config import IMG_START, IMG_ALERTS, IMG_GUIDE, IMG_PAYWALL, IMG_REF
 from database import *
 from indicators import fetch_price
 import httpx
@@ -29,6 +30,43 @@ async def send_message_safe_local(bot, user_id: int, text: str, **kwargs):
         return await send_message_safe_local(bot, user_id, text, **kwargs)
     except TelegramAPIError:
         return False
+
+async def send_photo_or_text(message_or_call, photo_url: str, text: str, reply_markup=None, is_callback=False):
+    """Отправить фото если есть URL, иначе текст"""
+    try:
+        if photo_url:
+            if is_callback:
+                # Для callback - удаляем старое и отправляем новое
+                try:
+                    await message_or_call.message.delete()
+                except:
+                    pass
+                await message_or_call.message.answer_photo(
+                    photo=photo_url,
+                    caption=text,
+                    reply_markup=reply_markup
+                )
+            else:
+                # Для обычного сообщения
+                await message_or_call.answer_photo(
+                    photo=photo_url,
+                    caption=text,
+                    reply_markup=reply_markup
+                )
+        else:
+            if is_callback:
+                await message_or_call.message.edit_text(text, reply_markup=reply_markup)
+            else:
+                await message_or_call.answer(text, reply_markup=reply_markup)
+    except Exception as e:
+        # Если фото не загрузилось - отправляем текст
+        if is_callback:
+            try:
+                await message_or_call.message.edit_text(text, reply_markup=reply_markup)
+            except:
+                await message_or_call.message.answer(text, reply_markup=reply_markup)
+        else:
+            await message_or_call.answer(text, reply_markup=reply_markup)
 
 # ==================== KEYBOARDS ====================
 def main_menu_kb(is_admin_user: bool, is_paid_user: bool, lang: str = "ru"):
@@ -134,18 +172,16 @@ def setup_handlers(dp):
         text += "📖 Жми Инструкция для деталей"
         
         paid = await is_paid(uid)
-        await message.answer(text, reply_markup=main_menu_kb(is_admin(uid), paid))
+        await send_photo_or_text(message, IMG_START, text, main_menu_kb(is_admin(uid), paid))
     
     # ==================== NAVIGATION ====================
     @dp.callback_query_handler(lambda c: c.data == "back_main")
     async def back_main(call: types.CallbackQuery):
         lang = await get_user_lang(call.from_user.id)
         paid = await is_paid(call.from_user.id)
-        try:
-            await call.message.edit_text(t(lang, "main_menu"), 
-                                         reply_markup=main_menu_kb(is_admin(call.from_user.id), paid, lang))
-        except:
-            pass
+        
+        text = t(lang, "main_menu")
+        await send_photo_or_text(call, IMG_START, text, main_menu_kb(is_admin(call.from_user.id), paid, lang), is_callback=True)
         await call.answer()
     
     # ==================== ALERTS ====================
@@ -165,7 +201,7 @@ def setup_handlers(dp):
         else:
             text = f"📈 <b>Manage Alerts</b>\n\nSelect coins (up to 10)\n\nActive: {len(pairs)}/10"
         
-        await call.message.edit_text(text, reply_markup=alerts_kb(pairs, lang))
+        await send_photo_or_text(call, IMG_ALERTS, text, alerts_kb(pairs, lang), is_callback=True)
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data.startswith("toggle_"))
@@ -200,7 +236,11 @@ def setup_handlers(dp):
         USER_STATES[uid] = {"mode": "waiting_custom_pair"}
         text = "➕ Отправь символ монеты\nПример: <code>SOLUSDT</code>"
         lang = await get_user_lang(uid)
-        await call.message.edit_text(text, reply_markup=alerts_kb(pairs, lang))
+        
+        try:
+            await call.message.edit_text(text, reply_markup=alerts_kb(pairs, lang))
+        except:
+            await call.message.answer(text, reply_markup=alerts_kb(pairs, lang))
         await call.answer()
     
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "waiting_custom_pair")
@@ -233,7 +273,11 @@ def setup_handlers(dp):
         kb = InlineKeyboardMarkup()
         kb.add(InlineKeyboardButton("🗑 Удалить всё", callback_data="clear_all"))
         kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_alerts"))
-        await call.message.edit_text(text, reply_markup=kb)
+        
+        try:
+            await call.message.edit_text(text, reply_markup=kb)
+        except:
+            await call.message.answer(text, reply_markup=kb)
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "clear_all")
@@ -251,16 +295,17 @@ def setup_handlers(dp):
             text += "<b>1. Выбери монеты</b>\nНажми на монету чтобы добавить её в отслеживание.\n\n"
             text += "<b>2. Бот анализирует рынок</b>\n7 индикаторов: EMA, RSI, MACD, BB, Volume, Дивергенции, ATR\n\n"
             text += "<b>3. Получаешь сигнал</b>\nТолько при силе 85+ баллов\n\n"
-            text += "<b>4. Управление</b>\n📍 TP1 (15%) - быстрая фиксация\n📍 TP2 (40%) - основная цель\n📍 TP3 (80%) - максимум тренда"
+            text += "<b>4. Управление</b>\n🎯 TP1 (15%) - быстрая фиксация\n🎯 TP2 (40%) - основная цель\n🎯 TP3 (80%) - максимум тренда"
         else:
             text = "💡 <b>How Alerts Work?</b>\n\n"
             text += "<b>1. Select Coins</b>\nClick to add to tracking.\n\n"
             text += "<b>2. Bot Analyzes</b>\n7 indicators: EMA, RSI, MACD, BB, Volume, Divergences, ATR\n\n"
             text += "<b>3. Receive Signal</b>\nOnly when strength 85+ points\n\n"
-            text += "<b>4. Management</b>\n📍 TP1 (15%) - quick profit\n📍 TP2 (40%) - main target\n📍 TP3 (80%) - max trend"
+            text += "<b>4. Management</b>\n🎯 TP1 (15%) - quick profit\n🎯 TP2 (40%) - main target\n🎯 TP3 (80%) - max trend"
         
         kb = InlineKeyboardMarkup()
         kb.add(InlineKeyboardButton(t(lang, "btn_back"), callback_data="menu_alerts"))
+        
         try:
             await call.message.edit_text(text, reply_markup=kb)
         except:
@@ -270,13 +315,14 @@ def setup_handlers(dp):
     # ==================== PAYMENT ====================
     @dp.callback_query_handler(lambda c: c.data == "menu_pay")
     async def menu_pay(call: types.CallbackQuery):
-        text = "🔒 <b>Открыть доступ</b>\n\n"
+        text = "🔓 <b>Открыть доступ</b>\n\n"
         text += "✅ 3-5 точных сигналов в день\n"
         text += "✅ Автоматический TP/SL\n"
         text += "✅ Мультистратегия\n"
         text += "✅ До 10 монет\n"
         text += "✅ Рефералка 50%"
-        await call.message.edit_text(text, reply_markup=pay_kb())
+        
+        await send_photo_or_text(call, IMG_PAYWALL, text, pay_kb(), is_callback=True)
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "pay_stars")
@@ -286,14 +332,20 @@ def setup_handlers(dp):
     @dp.callback_query_handler(lambda c: c.data == "pay_crypto")
     async def pay_crypto(call: types.CallbackQuery):
         text = f"💎 <b>Крипто-платёж</b>\n\nНапиши в поддержку для реквизитов.\n\n{SUPPORT_URL}"
-        await call.message.edit_text(text, reply_markup=pay_kb())
+        try:
+            await call.message.edit_text(text, reply_markup=pay_kb())
+        except:
+            await call.message.answer(text, reply_markup=pay_kb())
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "pay_code")
     async def pay_code(call: types.CallbackQuery):
         USER_STATES[call.from_user.id] = {"mode": "waiting_promo"}
         text = "🎟 Отправь промокод одним сообщением"
-        await call.message.edit_text(text, reply_markup=pay_kb())
+        try:
+            await call.message.edit_text(text, reply_markup=pay_kb())
+        except:
+            await call.message.answer(text, reply_markup=pay_kb())
         await call.answer()
     
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "waiting_promo")
@@ -306,7 +358,7 @@ def setup_handlers(dp):
     @dp.callback_query_handler(lambda c: c.data == "menu_ref")
     async def menu_ref(call: types.CallbackQuery):
         text = "👥 <b>Рефералка</b>\n\n50% от каждой подписки!\nВывод: крипта или Stars\nМинимум: $20"
-        await call.message.edit_text(text, reply_markup=ref_kb())
+        await send_photo_or_text(call, IMG_REF, text, ref_kb(), is_callback=True)
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "ref_link")
@@ -316,7 +368,11 @@ def setup_handlers(dp):
         me = await bot.get_me()
         link = f"https://t.me/{me.username}?start={call.from_user.id}"
         text = f"🔗 <b>Твоя ссылка:</b>\n\n<code>{link}</code>\n\nДелись и зарабатывай 50%!"
-        await call.message.edit_text(text, reply_markup=ref_kb(), disable_web_page_preview=True)
+        
+        try:
+            await call.message.edit_text(text, reply_markup=ref_kb(), disable_web_page_preview=True)
+        except:
+            await call.message.answer(text, reply_markup=ref_kb(), disable_web_page_preview=True)
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "ref_balance")
@@ -325,7 +381,10 @@ def setup_handlers(dp):
         refs = await get_user_refs_count(call.from_user.id)
         
         text = f"💰 <b>Баланс</b>\n\nДоступно: ${balance:.2f}\nРефералов: {refs}\n\nМинимум для вывода: $20"
-        await call.message.edit_text(text, reply_markup=ref_kb())
+        try:
+            await call.message.edit_text(text, reply_markup=ref_kb())
+        except:
+            await call.message.answer(text, reply_markup=ref_kb())
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data in ["ref_withdraw_crypto", "ref_withdraw_stars"])
@@ -334,13 +393,20 @@ def setup_handlers(dp):
             text = "💎 <b>Вывод крипты</b>\n\nФормат:\n<code>/withdraw USDT TRC20 адрес сумма</code>"
         else:
             text = "⭐ <b>Вывод Stars</b>\n\nФормат:\n<code>/withdraw_stars сумма</code>"
-        await call.message.edit_text(text, reply_markup=ref_kb())
+        
+        try:
+            await call.message.edit_text(text, reply_markup=ref_kb())
+        except:
+            await call.message.answer(text, reply_markup=ref_kb())
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "ref_guide")
     async def ref_guide(call: types.CallbackQuery):
         text = "📖 <b>Гайд для партнёров</b>\n\n1. Получи свою ссылку\n2. Делись с друзьями\n3. Получай 50% с подписок\n4. Выводи от $20"
-        await call.message.edit_text(text, reply_markup=ref_kb())
+        try:
+            await call.message.edit_text(text, reply_markup=ref_kb())
+        except:
+            await call.message.answer(text, reply_markup=ref_kb())
         await call.answer()
     
     @dp.message_handler(commands=["withdraw"])
@@ -417,10 +483,7 @@ def setup_handlers(dp):
         kb = InlineKeyboardMarkup()
         kb.add(InlineKeyboardButton(t(lang, "btn_back"), callback_data="back_main"))
         
-        try:
-            await call.message.edit_text(text, reply_markup=kb)
-        except:
-            await call.message.answer(text, reply_markup=kb)
+        await send_photo_or_text(call, IMG_GUIDE, text, kb, is_callback=True)
         await call.answer()
     
     # ==================== ADMIN ====================
@@ -429,7 +492,11 @@ def setup_handlers(dp):
         if not is_admin(call.from_user.id):
             await call.answer("❌ Нет доступа", show_alert=True)
             return
-        await call.message.edit_text("👑 <b>Админ-панель</b>", reply_markup=admin_kb())
+        
+        try:
+            await call.message.edit_text("👑 <b>Админ-панель</b>", reply_markup=admin_kb())
+        except:
+            await call.message.answer("👑 <b>Админ-панель</b>", reply_markup=admin_kb())
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "adm_stats")
@@ -442,7 +509,10 @@ def setup_handlers(dp):
         active = await get_active_users_count()
         
         text = f"📊 <b>Статистика</b>\n\n👥 Всего: {total}\n💎 Оплативших: {paid}\n📈 Активных: {active}"
-        await call.message.edit_text(text, reply_markup=admin_kb())
+        try:
+            await call.message.edit_text(text, reply_markup=admin_kb())
+        except:
+            await call.message.answer(text, reply_markup=admin_kb())
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "adm_broadcast")
@@ -450,7 +520,10 @@ def setup_handlers(dp):
         if not is_admin(call.from_user.id):
             return
         USER_STATES[call.from_user.id] = {"mode": "admin_broadcast"}
-        await call.message.edit_text("📢 Отправь текст рассылки", reply_markup=admin_kb())
+        try:
+            await call.message.edit_text("📢 Отправь текст рассылки", reply_markup=admin_kb())
+        except:
+            await call.message.answer("📢 Отправь текст рассылки", reply_markup=admin_kb())
         await call.answer()
     
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "admin_broadcast")
@@ -479,7 +552,10 @@ def setup_handlers(dp):
         if not is_admin(call.from_user.id):
             return
         USER_STATES[call.from_user.id] = {"mode": "admin_grant"}
-        await call.message.edit_text("✅ Отправь ID пользователя", reply_markup=admin_kb())
+        try:
+            await call.message.edit_text("✅ Отправь ID пользователя", reply_markup=admin_kb())
+        except:
+            await call.message.answer("✅ Отправь ID пользователя", reply_markup=admin_kb())
         await call.answer()
     
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "admin_grant")
@@ -509,7 +585,10 @@ def setup_handlers(dp):
         if not is_admin(call.from_user.id):
             return
         USER_STATES[call.from_user.id] = {"mode": "admin_give_uid"}
-        await call.message.edit_text("💰 Отправь ID пользователя", reply_markup=admin_kb())
+        try:
+            await call.message.edit_text("💰 Отправь ID пользователя", reply_markup=admin_kb())
+        except:
+            await call.message.answer("💰 Отправь ID пользователя", reply_markup=admin_kb())
         await call.answer()
     
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "admin_give_uid")
