@@ -174,6 +174,39 @@ def setup_handlers(dp):
         paid = await is_paid(uid)
         await send_photo_or_text(message, IMG_START, text, main_menu_kb(is_admin(uid), paid))
     
+    # ==================== LANGUAGE ====================
+    @dp.callback_query_handler(lambda c: c.data == "change_lang")
+    async def change_lang_menu(call: types.CallbackQuery):
+        """Меню выбора языка"""
+        text = "🌐 <b>Choose Language / Выбери язык</b>"
+        
+        kb = InlineKeyboardMarkup(row_width=2)
+        kb.add(
+            InlineKeyboardButton("🇷🇺 Русский", callback_data="lang_ru"),
+            InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")
+        )
+        kb.add(InlineKeyboardButton("⬅️ Назад / Back", callback_data="back_main"))
+        
+        try:
+            await call.message.edit_text(text, reply_markup=kb)
+        except:
+            await call.message.answer(text, reply_markup=kb)
+        await call.answer()
+    
+    @dp.callback_query_handler(lambda c: c.data.startswith("lang_"))
+    async def set_language(call: types.CallbackQuery):
+        """Установить язык"""
+        lang = call.data.split("_")[1]  # ru или en
+        await set_user_lang(call.from_user.id, lang)
+        
+        if lang == "ru":
+            await call.answer("✅ Язык изменён на Русский", show_alert=True)
+        else:
+            await call.answer("✅ Language changed to English", show_alert=True)
+        
+        # Вернуться в главное меню с новым языком
+        await back_main(call)
+    
     # ==================== NAVIGATION ====================
     @dp.callback_query_handler(lambda c: c.data == "back_main")
     async def back_main(call: types.CallbackQuery):
