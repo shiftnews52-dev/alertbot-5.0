@@ -145,27 +145,76 @@ def setup_handlers(dp):
     """Регистрация всех хендлеров"""
     
     # ==================== MAIN COMMANDS ====================
+    async def show_language_selection(message: types.Message):
+        """Показать выбор языка для новых пользователей"""
+        text = "👋 <b>Welcome! / Привет!</b>\n\n"
+        text += "🌐 Please select your language\n"
+        text += "🌐 Пожалуйста, выбери свой язык"
+        
+        kb = InlineKeyboardMarkup(row_width=2)
+        kb.add(
+            InlineKeyboardButton("🇷🇺 Русский", callback_data="first_lang_ru"),
+            InlineKeyboardButton("🇬🇧 English", callback_data="first_lang_en")
+        )
+        
+        if IMG_START:
+            await message.answer_photo(photo=IMG_START, caption=text, reply_markup=kb)
+        else:
+            await message.answer(text, reply_markup=kb)
+    
     @dp.message_handler(commands=["start"])
     async def cmd_start(message: types.Message):
         uid = message.from_user.id
         args = message.get_args()
         invited_by = int(args) if args and args.isdigit() and int(args) != uid else None
         
+        # Проверяем, новый ли пользователь
         conn = await db_pool.acquire()
         try:
-            await conn.execute(
-                "INSERT OR IGNORE INTO users(id, invited_by, created_ts) VALUES(?,?,?)",
-                (uid, invited_by, int(time.time()))
-            )
-            await conn.commit()
+            cursor = await conn.execute("SELECT id FROM users WHERE id=?", (uid,))
+            existing_user = await cursor.fetchone()
+            
+            if not existing_user:
+                # Новый пользователь - создаём запись
+                await conn.execute(
+                    "INSERT INTO users(id, invited_by, created_ts) VALUES(?,?,?)",
+                    (uid, invited_by, int(time.time()))
+                )
+                await conn.commit()
+                
+                # Показываем выбор языка для новых пользователей
+                await show_language_selection(message)
+                return
         finally:
             await db_pool.release(conn)
         
+        # Существующий пользователь - показываем главное меню
         lang = await get_user_lang(uid)
         text = t(lang, "start_text")
         
         paid = await is_paid(uid)
         await send_photo_or_text(message, IMG_START, text, main_menu_kb(is_admin(uid), paid, lang))
+    
+    @dp.callback_query_handler(lambda c: c.data.startswith("first_lang_"))
+    async def set_first_language(call: types.CallbackQuery):
+        """Установить язык при первом запуске"""
+        uid = call.from_user.id
+        lang = call.data.split("_")[2]  # ru или en
+        
+        # Сохраняем язык
+        await set_user_lang(uid, lang)
+        
+        # Показываем главное меню с выбранным языком
+        text = t(lang, "start_text")
+        paid = await is_paid(uid)
+        
+        try:
+            await call.message.delete()
+        except:
+            pass
+        
+        await send_photo_or_text(call, IMG_START, text, main_menu_kb(is_admin(uid), paid, lang))
+        await call.answer()
     
     # ==================== LANGUAGE ====================
     @dp.callback_query_handler(lambda c: c.data == "change_lang")
