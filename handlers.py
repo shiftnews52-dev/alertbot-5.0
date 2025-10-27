@@ -1,5 +1,5 @@
 """
-handlers.py - Обработчики команд и кнопок (с поддержкой картинок)
+handlers.py - Обработчики команд и кнопок (полная версия)
 """
 import time
 import asyncio
@@ -36,7 +36,6 @@ async def send_photo_or_text(message_or_call, photo_url: str, text: str, reply_m
     try:
         if photo_url:
             if is_callback:
-                # Для callback - удаляем старое и отправляем новое
                 try:
                     await message_or_call.message.delete()
                 except:
@@ -47,7 +46,6 @@ async def send_photo_or_text(message_or_call, photo_url: str, text: str, reply_m
                     reply_markup=reply_markup
                 )
             else:
-                # Для обычного сообщения
                 await message_or_call.answer_photo(
                     photo=photo_url,
                     caption=text,
@@ -58,8 +56,7 @@ async def send_photo_or_text(message_or_call, photo_url: str, text: str, reply_m
                 await message_or_call.message.edit_text(text, reply_markup=reply_markup)
             else:
                 await message_or_call.answer(text, reply_markup=reply_markup)
-    except Exception as e:
-        # Если фото не загрузилось - отправляем текст
+    except Exception:
         if is_callback:
             try:
                 await message_or_call.message.edit_text(text, reply_markup=reply_markup)
@@ -94,9 +91,9 @@ def alerts_kb(user_pairs: list, lang: str = "ru"):
         emoji = "✅" if pair in user_pairs else "➕"
         kb.add(InlineKeyboardButton(f"{emoji} {pair}", callback_data=f"toggle_{pair}"))
     
-    add_btn = "➕ Своя монета" if lang == "ru" else "➕ Custom coin"
-    my_btn = "📋 Мои монеты" if lang == "ru" else "📋 My coins"
-    info_btn = "💡 Как это работает?" if lang == "ru" else "💡 How it works?"
+    add_btn = t(lang, "add_custom_coin")
+    my_btn = t(lang, "my_coins")
+    info_btn = t(lang, "how_it_works")
     
     kb.add(
         InlineKeyboardButton(add_btn, callback_data="add_custom"),
@@ -106,41 +103,41 @@ def alerts_kb(user_pairs: list, lang: str = "ru"):
     kb.add(InlineKeyboardButton(t(lang, "btn_back"), callback_data="back_main"))
     return kb
 
-def ref_kb():
+def ref_kb(lang: str = "ru"):
     kb = InlineKeyboardMarkup(row_width=2)
     kb.add(
-        InlineKeyboardButton("🔗 Моя ссылка", callback_data="ref_link"),
-        InlineKeyboardButton("💰 Баланс", callback_data="ref_balance")
+        InlineKeyboardButton("🔗 " + ("Моя ссылка" if lang == "ru" else "My link"), callback_data="ref_link"),
+        InlineKeyboardButton("💰 " + ("Баланс" if lang == "ru" else "Balance"), callback_data="ref_balance")
     )
     kb.add(
-        InlineKeyboardButton("💎 Вывод (крипта)", callback_data="ref_withdraw_crypto"),
-        InlineKeyboardButton("⭐ Вывод (Stars)", callback_data="ref_withdraw_stars")
+        InlineKeyboardButton("💎 " + ("Вывод (крипта)" if lang == "ru" else "Withdraw (crypto)"), callback_data="ref_withdraw_crypto"),
+        InlineKeyboardButton("⭐ " + ("Вывод (Stars)" if lang == "ru" else "Withdraw (Stars)"), callback_data="ref_withdraw_stars")
     )
-    kb.add(InlineKeyboardButton("📖 Гайд для рефов", callback_data="ref_guide"))
-    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="back_main"))
+    kb.add(InlineKeyboardButton("📖 " + ("Гайд" if lang == "ru" else "Guide"), callback_data="ref_guide"))
+    kb.add(InlineKeyboardButton(t(lang, "btn_back"), callback_data="back_main"))
     return kb
 
-def pay_kb():
+def pay_kb(lang: str = "ru"):
     kb = InlineKeyboardMarkup(row_width=2)
     kb.add(
-        InlineKeyboardButton("⭐ Оплата Stars", callback_data="pay_stars"),
-        InlineKeyboardButton("💎 Крипто", callback_data="pay_crypto")
+        InlineKeyboardButton("⭐ " + t(lang, "pay_stars"), callback_data="pay_stars"),
+        InlineKeyboardButton("💎 " + t(lang, "pay_crypto"), callback_data="pay_crypto")
     )
-    kb.add(InlineKeyboardButton("🎟 У меня код", callback_data="pay_code"))
-    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="back_main"))
+    kb.add(InlineKeyboardButton("🎟 " + t(lang, "pay_code"), callback_data="pay_code"))
+    kb.add(InlineKeyboardButton(t(lang, "btn_back"), callback_data="back_main"))
     return kb
 
-def admin_kb():
+def admin_kb(lang: str = "ru"):
     kb = InlineKeyboardMarkup(row_width=2)
     kb.add(
-        InlineKeyboardButton("📊 Статистика", callback_data="adm_stats"),
-        InlineKeyboardButton("📢 Рассылка", callback_data="adm_broadcast")
+        InlineKeyboardButton("📊 " + ("Статистика" if lang == "ru" else "Statistics"), callback_data="adm_stats"),
+        InlineKeyboardButton("📢 " + ("Рассылка" if lang == "ru" else "Broadcast"), callback_data="adm_broadcast")
     )
     kb.add(
-        InlineKeyboardButton("✅ Выдать доступ", callback_data="adm_grant"),
-        InlineKeyboardButton("💰 Начислить", callback_data="adm_give")
+        InlineKeyboardButton("✅ " + ("Выдать доступ" if lang == "ru" else "Grant access"), callback_data="adm_grant"),
+        InlineKeyboardButton("💰 " + ("Начислить" if lang == "ru" else "Add balance"), callback_data="adm_give")
     )
-    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="back_main"))
+    kb.add(InlineKeyboardButton(t(lang, "btn_back"), callback_data="back_main"))
     return kb
 
 # ==================== SETUP HANDLERS ====================
@@ -164,15 +161,11 @@ def setup_handlers(dp):
         finally:
             await db_pool.release(conn)
         
-        text = f"<b>🚀 {BOT_NAME}</b>\n\n"
-        text += "Точные сигналы с автоматическим TP/SL\n\n"
-        text += "• 3-5 сильных сигналов в день\n"
-        text += "• Мультистратегия (5+ индикаторов)\n"
-        text += "• Объяснение каждого входа\n\n"
-        text += "📖 Жми Инструкция для деталей"
+        lang = await get_user_lang(uid)
+        text = t(lang, "start_text")
         
         paid = await is_paid(uid)
-        await send_photo_or_text(message, IMG_START, text, main_menu_kb(is_admin(uid), paid))
+        await send_photo_or_text(message, IMG_START, text, main_menu_kb(is_admin(uid), paid, lang))
     
     # ==================== LANGUAGE ====================
     @dp.callback_query_handler(lambda c: c.data == "change_lang")
@@ -196,15 +189,10 @@ def setup_handlers(dp):
     @dp.callback_query_handler(lambda c: c.data.startswith("lang_"))
     async def set_language(call: types.CallbackQuery):
         """Установить язык"""
-        lang = call.data.split("_")[1]  # ru или en
+        lang = call.data.split("_")[1]
         await set_user_lang(call.from_user.id, lang)
         
-        if lang == "ru":
-            await call.answer("✅ Язык изменён на Русский", show_alert=True)
-        else:
-            await call.answer("✅ Language changed to English", show_alert=True)
-        
-        # Вернуться в главное меню с новым языком
+        await call.answer(t(lang, "language_changed"), show_alert=True)
         await back_main(call)
     
     # ==================== NAVIGATION ====================
@@ -228,11 +216,7 @@ def setup_handlers(dp):
             return
         
         pairs = await get_user_pairs(uid)
-        
-        if lang == "ru":
-            text = f"📈 <b>Управление алертами</b>\n\nВыбери монеты (до 10)\n\nАктивно: {len(pairs)}/10"
-        else:
-            text = f"📈 <b>Manage Alerts</b>\n\nSelect coins (up to 10)\n\nActive: {len(pairs)}/10"
+        text = t(lang, "alerts_title", count=len(pairs))
         
         await send_photo_or_text(call, IMG_ALERTS, text, alerts_kb(pairs, lang), is_callback=True)
         await call.answer()
@@ -240,8 +224,10 @@ def setup_handlers(dp):
     @dp.callback_query_handler(lambda c: c.data.startswith("toggle_"))
     async def toggle_pair(call: types.CallbackQuery):
         uid = call.from_user.id
+        lang = await get_user_lang(uid)
+        
         if not await is_paid(uid):
-            await call.answer("Оплатите доступ!", show_alert=True)
+            await call.answer(t(lang, "access_required"), show_alert=True)
             return
         
         pair = call.data.split("_", 1)[1]
@@ -249,26 +235,28 @@ def setup_handlers(dp):
         
         if pair in pairs:
             await remove_user_pair(uid, pair)
-            await call.answer(f"❌ {pair} удалён")
+            await call.answer(t(lang, "coin_removed", pair=pair))
         else:
             if len(pairs) >= 10:
-                await call.answer("Максимум 10 монет!", show_alert=True)
+                await call.answer(t(lang, "max_coins"), show_alert=True)
                 return
             await add_user_pair(uid, pair)
-            await call.answer(f"✅ {pair} добавлен")
+            await call.answer(t(lang, "coin_added", pair=pair))
         
         await menu_alerts(call)
     
     @dp.callback_query_handler(lambda c: c.data == "add_custom")
     async def add_custom(call: types.CallbackQuery):
         uid = call.from_user.id
-        pairs = await get_user_pairs(uid)
-        if len(pairs) >= 10:
-            await call.answer("Максимум 10 монет!", show_alert=True)
-            return
-        USER_STATES[uid] = {"mode": "waiting_custom_pair"}
-        text = "➕ Отправь символ монеты\nПример: <code>SOLUSDT</code>"
         lang = await get_user_lang(uid)
+        pairs = await get_user_pairs(uid)
+        
+        if len(pairs) >= 10:
+            await call.answer(t(lang, "max_coins"), show_alert=True)
+            return
+        
+        USER_STATES[uid] = {"mode": "waiting_custom_pair"}
+        text = t(lang, "send_coin_symbol")
         
         try:
             await call.message.edit_text(text, reply_markup=alerts_kb(pairs, lang))
@@ -279,33 +267,38 @@ def setup_handlers(dp):
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "waiting_custom_pair")
     async def handle_custom_pair(message: types.Message):
         uid = message.from_user.id
+        lang = await get_user_lang(uid)
         pair = message.text.strip().upper()
         
         if not pair.endswith("USDT") or len(pair) < 6:
-            await message.answer("❌ Неверный формат. Пример: SOLUSDT")
+            await message.answer(t(lang, "invalid_format"))
             return
         
         async with httpx.AsyncClient() as client:
             price_data = await fetch_price(client, pair)
             if not price_data:
-                await message.answer(f"❌ Пара {pair} не найдена")
+                await message.answer(t(lang, "pair_not_found", pair=pair))
                 return
         
         await add_user_pair(uid, pair)
         USER_STATES.pop(uid, None)
-        await message.answer(f"✅ {pair} добавлена!")
+        await message.answer(t(lang, "coin_added", pair=pair))
     
     @dp.callback_query_handler(lambda c: c.data == "my_pairs")
     async def my_pairs(call: types.CallbackQuery):
+        lang = await get_user_lang(call.from_user.id)
         pairs = await get_user_pairs(call.from_user.id)
+        
         if not pairs:
-            await call.answer("Нет активных монет", show_alert=True)
+            await call.answer(t(lang, "no_active_coins"), show_alert=True)
             return
         
-        text = "📋 <b>Мои монеты</b>\n\n" + "\n".join(f"• {p}" for p in pairs)
+        title = "📋 <b>" + t(lang, "my_coins") + "</b>\n\n"
+        text = title + "\n".join(f"• {p}" for p in pairs)
+        
         kb = InlineKeyboardMarkup()
-        kb.add(InlineKeyboardButton("🗑 Удалить всё", callback_data="clear_all"))
-        kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="menu_alerts"))
+        kb.add(InlineKeyboardButton("🗑 " + t(lang, "all_removed"), callback_data="clear_all"))
+        kb.add(InlineKeyboardButton(t(lang, "btn_back"), callback_data="menu_alerts"))
         
         try:
             await call.message.edit_text(text, reply_markup=kb)
@@ -315,26 +308,20 @@ def setup_handlers(dp):
     
     @dp.callback_query_handler(lambda c: c.data == "clear_all")
     async def clear_all(call: types.CallbackQuery):
+        lang = await get_user_lang(call.from_user.id)
         await clear_user_pairs(call.from_user.id)
-        await call.answer("🗑 Всё удалено")
+        await call.answer(t(lang, "all_removed"))
         await menu_alerts(call)
     
     @dp.callback_query_handler(lambda c: c.data == "alerts_info")
     async def alerts_info(call: types.CallbackQuery):
         lang = await get_user_lang(call.from_user.id)
         
-        if lang == "ru":
-            text = "💡 <b>Как работают алерты?</b>\n\n"
-            text += "<b>1. Выбери монеты</b>\nНажми на монету чтобы добавить её в отслеживание.\n\n"
-            text += "<b>2. Бот анализирует рынок</b>\n7 индикаторов: EMA, RSI, MACD, BB, Volume, Дивергенции, ATR\n\n"
-            text += "<b>3. Получаешь сигнал</b>\nТолько при силе 85+ баллов\n\n"
-            text += "<b>4. Управление</b>\n🎯 TP1 (15%) - быстрая фиксация\n🎯 TP2 (40%) - основная цель\n🎯 TP3 (80%) - максимум тренда"
-        else:
-            text = "💡 <b>How Alerts Work?</b>\n\n"
-            text += "<b>1. Select Coins</b>\nClick to add to tracking.\n\n"
-            text += "<b>2. Bot Analyzes</b>\n7 indicators: EMA, RSI, MACD, BB, Volume, Divergences, ATR\n\n"
-            text += "<b>3. Receive Signal</b>\nOnly when strength 85+ points\n\n"
-            text += "<b>4. Management</b>\n🎯 TP1 (15%) - quick profit\n🎯 TP2 (40%) - main target\n🎯 TP3 (80%) - max trend"
+        text = t(lang, "guide_title") + "\n\n"
+        text += t(lang, "guide_step1") + "\n"
+        text += t(lang, "guide_step2") + "\n"
+        text += t(lang, "guide_step3") + "\n\n"
+        text += t(lang, "guide_signal_info")
         
         kb = InlineKeyboardMarkup()
         kb.add(InlineKeyboardButton(t(lang, "btn_back"), callback_data="menu_alerts"))
@@ -348,118 +335,129 @@ def setup_handlers(dp):
     # ==================== PAYMENT ====================
     @dp.callback_query_handler(lambda c: c.data == "menu_pay")
     async def menu_pay(call: types.CallbackQuery):
-        text = "🔓 <b>Открыть доступ</b>\n\n"
-        text += "✅ 3-5 точных сигналов в день\n"
-        text += "✅ Автоматический TP/SL\n"
-        text += "✅ Мультистратегия\n"
-        text += "✅ До 10 монет\n"
-        text += "✅ Рефералка 50%"
+        lang = await get_user_lang(call.from_user.id)
+        text = t(lang, "payment_title") + "\n\n" + t(lang, "payment_features")
         
-        await send_photo_or_text(call, IMG_PAYWALL, text, pay_kb(), is_callback=True)
+        await send_photo_or_text(call, IMG_PAYWALL, text, pay_kb(lang), is_callback=True)
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "pay_stars")
     async def pay_stars(call: types.CallbackQuery):
-        await call.answer("В разработке. Используйте промокод.", show_alert=True)
+        lang = await get_user_lang(call.from_user.id)
+        await call.answer(t(lang, "in_development"), show_alert=True)
     
     @dp.callback_query_handler(lambda c: c.data == "pay_crypto")
     async def pay_crypto(call: types.CallbackQuery):
-        text = f"💎 <b>Крипто-платёж</b>\n\nНапиши в поддержку для реквизитов.\n\n{SUPPORT_URL}"
+        lang = await get_user_lang(call.from_user.id)
+        text = t(lang, "crypto_payment_info", support_url=SUPPORT_URL)
+        
         try:
-            await call.message.edit_text(text, reply_markup=pay_kb())
+            await call.message.edit_text(text, reply_markup=pay_kb(lang))
         except:
-            await call.message.answer(text, reply_markup=pay_kb())
+            await call.message.answer(text, reply_markup=pay_kb(lang))
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "pay_code")
     async def pay_code(call: types.CallbackQuery):
+        lang = await get_user_lang(call.from_user.id)
         USER_STATES[call.from_user.id] = {"mode": "waiting_promo"}
-        text = "🎟 Отправь промокод одним сообщением"
+        text = t(lang, "send_promo")
+        
         try:
-            await call.message.edit_text(text, reply_markup=pay_kb())
+            await call.message.edit_text(text, reply_markup=pay_kb(lang))
         except:
-            await call.message.answer(text, reply_markup=pay_kb())
+            await call.message.answer(text, reply_markup=pay_kb(lang))
         await call.answer()
     
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "waiting_promo")
     async def handle_promo(message: types.Message):
+        lang = await get_user_lang(message.from_user.id)
         await grant_access(message.from_user.id)
         USER_STATES.pop(message.from_user.id, None)
-        await message.answer("✅ Доступ активирован!\n\nНажми /start")
+        await message.answer(t(lang, "access_granted"))
     
     # ==================== REFERRAL ====================
     @dp.callback_query_handler(lambda c: c.data == "menu_ref")
     async def menu_ref(call: types.CallbackQuery):
-        text = "👥 <b>Рефералка</b>\n\n50% от каждой подписки!\nВывод: крипта или Stars\nМинимум: $20"
-        await send_photo_or_text(call, IMG_REF, text, ref_kb(), is_callback=True)
+        lang = await get_user_lang(call.from_user.id)
+        text = t(lang, "ref_title")
+        await send_photo_or_text(call, IMG_REF, text, ref_kb(lang), is_callback=True)
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "ref_link")
     async def ref_link(call: types.CallbackQuery):
+        lang = await get_user_lang(call.from_user.id)
         from aiogram import Bot
         bot = Bot.get_current()
         me = await bot.get_me()
         link = f"https://t.me/{me.username}?start={call.from_user.id}"
-        text = f"🔗 <b>Твоя ссылка:</b>\n\n<code>{link}</code>\n\nДелись и зарабатывай 50%!"
+        text = t(lang, "ref_link", link=link)
         
         try:
-            await call.message.edit_text(text, reply_markup=ref_kb(), disable_web_page_preview=True)
+            await call.message.edit_text(text, reply_markup=ref_kb(lang), disable_web_page_preview=True)
         except:
-            await call.message.answer(text, reply_markup=ref_kb(), disable_web_page_preview=True)
+            await call.message.answer(text, reply_markup=ref_kb(lang), disable_web_page_preview=True)
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "ref_balance")
     async def ref_balance_handler(call: types.CallbackQuery):
+        lang = await get_user_lang(call.from_user.id)
         balance = await get_user_balance(call.from_user.id)
         refs = await get_user_refs_count(call.from_user.id)
         
-        text = f"💰 <b>Баланс</b>\n\nДоступно: ${balance:.2f}\nРефералов: {refs}\n\nМинимум для вывода: $20"
+        text = t(lang, "ref_balance", balance=balance, refs=refs)
         try:
-            await call.message.edit_text(text, reply_markup=ref_kb())
+            await call.message.edit_text(text, reply_markup=ref_kb(lang))
         except:
-            await call.message.answer(text, reply_markup=ref_kb())
+            await call.message.answer(text, reply_markup=ref_kb(lang))
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data in ["ref_withdraw_crypto", "ref_withdraw_stars"])
     async def ref_withdraw(call: types.CallbackQuery):
+        lang = await get_user_lang(call.from_user.id)
+        
         if call.data == "ref_withdraw_crypto":
-            text = "💎 <b>Вывод крипты</b>\n\nФормат:\n<code>/withdraw USDT TRC20 адрес сумма</code>"
+            text = t(lang, "withdraw_crypto_format")
         else:
-            text = "⭐ <b>Вывод Stars</b>\n\nФормат:\n<code>/withdraw_stars сумма</code>"
+            text = t(lang, "withdraw_stars_format")
         
         try:
-            await call.message.edit_text(text, reply_markup=ref_kb())
+            await call.message.edit_text(text, reply_markup=ref_kb(lang))
         except:
-            await call.message.answer(text, reply_markup=ref_kb())
+            await call.message.answer(text, reply_markup=ref_kb(lang))
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "ref_guide")
     async def ref_guide(call: types.CallbackQuery):
-        text = "📖 <b>Гайд для партнёров</b>\n\n1. Получи свою ссылку\n2. Делись с друзьями\n3. Получай 50% с подписок\n4. Выводи от $20"
+        lang = await get_user_lang(call.from_user.id)
+        text = t(lang, "ref_guide_text")
+        
         try:
-            await call.message.edit_text(text, reply_markup=ref_kb())
+            await call.message.edit_text(text, reply_markup=ref_kb(lang))
         except:
-            await call.message.answer(text, reply_markup=ref_kb())
+            await call.message.answer(text, reply_markup=ref_kb(lang))
         await call.answer()
     
     @dp.message_handler(commands=["withdraw"])
     async def cmd_withdraw(message: types.Message):
+        lang = await get_user_lang(message.from_user.id)
         parts = message.text.split()
+        
         if len(parts) != 5:
-            await message.reply("❌ Формат: /withdraw USDT TRC20 адрес сумма")
+            await message.reply(t(lang, "withdraw_invalid_format"))
             return
         
         try:
             amount = float(parts[4])
         except:
-            await message.reply("❌ Сумма должна быть числом")
+            await message.reply(t(lang, "withdraw_invalid_amount"))
             return
         
         if amount < 20:
-            await message.reply("❌ Минимум $20")
+            await message.reply(t(lang, "withdraw_min_amount"))
             return
         
-        await message.reply(f"✅ Заявка принята: {amount} {parts[1]}\n\nОжидайте обработки (до 24ч)")
+        await message.reply(t(lang, "withdraw_accepted", amount=amount, currency=parts[1]))
         
         from aiogram import Bot
         bot = Bot.get_current()
@@ -474,44 +472,36 @@ def setup_handlers(dp):
     
     @dp.message_handler(commands=["withdraw_stars"])
     async def cmd_withdraw_stars(message: types.Message):
+        lang = await get_user_lang(message.from_user.id)
         parts = message.text.split()
+        
         if len(parts) != 2:
-            await message.reply("❌ Формат: /withdraw_stars сумма")
+            await message.reply(t(lang, "withdraw_stars_format"))
             return
         
         try:
             amount = int(parts[1])
         except:
-            await message.reply("❌ Сумма должна быть числом")
+            await message.reply(t(lang, "withdraw_invalid_amount"))
             return
         
         if amount < 20:
-            await message.reply("❌ Минимум 20 Stars")
+            await message.reply(t(lang, "withdraw_min_amount"))
             return
         
-        await message.reply(f"✅ Заявка на {amount} Stars принята\n\nОжидайте (до 24ч)")
+        await message.reply(t(lang, "withdraw_accepted", amount=amount, currency="Stars"))
     
     # ==================== GUIDE ====================
     @dp.callback_query_handler(lambda c: c.data == "menu_guide")
     async def menu_guide(call: types.CallbackQuery):
         lang = await get_user_lang(call.from_user.id)
         
-        if lang == "ru":
-            text = "📖 <b>Инструкция</b>\n\n"
-            text += "<b>Шаг 1:</b> Оплати доступ\n"
-            text += "<b>Шаг 2:</b> Выбери монеты (до 10)\n"
-            text += "<b>Шаг 3:</b> Получай сигналы\n\n"
-            text += "<b>В каждом сигнале:</b>\n"
-            text += "• Цена входа\n• 🎯 TP1/TP2/TP3\n• 🛡 Stop Loss\n• Причины входа\n• Сила сигнала\n\n"
-            text += "<b>⚠️ Важно:</b> Это не финансовый совет"
-        else:
-            text = "📖 <b>Guide</b>\n\n"
-            text += "<b>Step 1:</b> Pay for access\n"
-            text += "<b>Step 2:</b> Select coins (up to 10)\n"
-            text += "<b>Step 3:</b> Receive signals\n\n"
-            text += "<b>Each signal includes:</b>\n"
-            text += "• Entry price\n• 🎯 TP1/TP2/TP3\n• 🛡 Stop Loss\n• Entry reasons\n• Signal strength\n\n"
-            text += "<b>⚠️ Important:</b> This is not financial advice"
+        text = t(lang, "guide_title") + "\n\n"
+        text += t(lang, "guide_step1") + "\n"
+        text += t(lang, "guide_step2") + "\n"
+        text += t(lang, "guide_step3") + "\n\n"
+        text += t(lang, "guide_signal_info") + "\n\n"
+        text += t(lang, "guide_disclaimer")
         
         kb = InlineKeyboardMarkup()
         kb.add(InlineKeyboardButton(t(lang, "btn_back"), callback_data="back_main"))
@@ -522,14 +512,16 @@ def setup_handlers(dp):
     # ==================== ADMIN ====================
     @dp.callback_query_handler(lambda c: c.data == "menu_admin")
     async def menu_admin(call: types.CallbackQuery):
+        lang = await get_user_lang(call.from_user.id)
+        
         if not is_admin(call.from_user.id):
-            await call.answer("❌ Нет доступа", show_alert=True)
+            await call.answer(t(lang, "admin_no_access"), show_alert=True)
             return
         
         try:
-            await call.message.edit_text("👑 <b>Админ-панель</b>", reply_markup=admin_kb())
+            await call.message.edit_text(t(lang, "admin_title"), reply_markup=admin_kb(lang))
         except:
-            await call.message.answer("👑 <b>Админ-панель</b>", reply_markup=admin_kb())
+            await call.message.answer(t(lang, "admin_title"), reply_markup=admin_kb(lang))
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "adm_stats")
@@ -537,26 +529,30 @@ def setup_handlers(dp):
         if not is_admin(call.from_user.id):
             return
         
+        lang = await get_user_lang(call.from_user.id)
         total = await get_users_count()
         paid = await get_paid_users_count()
         active = await get_active_users_count()
         
-        text = f"📊 <b>Статистика</b>\n\n👥 Всего: {total}\n💎 Оплативших: {paid}\n📈 Активных: {active}"
+        text = t(lang, "admin_stats", total=total, paid=paid, active=active)
         try:
-            await call.message.edit_text(text, reply_markup=admin_kb())
+            await call.message.edit_text(text, reply_markup=admin_kb(lang))
         except:
-            await call.message.answer(text, reply_markup=admin_kb())
+            await call.message.answer(text, reply_markup=admin_kb(lang))
         await call.answer()
     
     @dp.callback_query_handler(lambda c: c.data == "adm_broadcast")
     async def adm_broadcast(call: types.CallbackQuery):
         if not is_admin(call.from_user.id):
             return
+        
+        lang = await get_user_lang(call.from_user.id)
         USER_STATES[call.from_user.id] = {"mode": "admin_broadcast"}
+        
         try:
-            await call.message.edit_text("📢 Отправь текст рассылки", reply_markup=admin_kb())
+            await call.message.edit_text(t(lang, "admin_send_broadcast"), reply_markup=admin_kb(lang))
         except:
-            await call.message.answer("📢 Отправь текст рассылки", reply_markup=admin_kb())
+            await call.message.answer(t(lang, "admin_send_broadcast"), reply_markup=admin_kb(lang))
         await call.answer()
     
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "admin_broadcast")
@@ -564,6 +560,7 @@ def setup_handlers(dp):
         if not is_admin(message.from_user.id):
             return
         
+        lang = await get_user_lang(message.from_user.id)
         text = message.html_text
         users = await get_all_user_ids()
         
@@ -578,17 +575,20 @@ def setup_handlers(dp):
             await asyncio.sleep(BATCH_SEND_DELAY)
         
         USER_STATES.pop(message.from_user.id, None)
-        await message.reply(f"✅ Разослано: {sent}/{len(users)}")
+        await message.reply(t(lang, "admin_broadcast_done", sent=sent, total=len(users)))
     
     @dp.callback_query_handler(lambda c: c.data == "adm_grant")
     async def adm_grant(call: types.CallbackQuery):
         if not is_admin(call.from_user.id):
             return
+        
+        lang = await get_user_lang(call.from_user.id)
         USER_STATES[call.from_user.id] = {"mode": "admin_grant"}
+        
         try:
-            await call.message.edit_text("✅ Отправь ID пользователя", reply_markup=admin_kb())
+            await call.message.edit_text(t(lang, "admin_send_user_id"), reply_markup=admin_kb(lang))
         except:
-            await call.message.answer("✅ Отправь ID пользователя", reply_markup=admin_kb())
+            await call.message.answer(t(lang, "admin_send_user_id"), reply_markup=admin_kb(lang))
         await call.answer()
     
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "admin_grant")
@@ -596,20 +596,22 @@ def setup_handlers(dp):
         if not is_admin(message.from_user.id):
             return
         
+        lang = await get_user_lang(message.from_user.id)
+        
         try:
             uid = int(message.text.strip())
         except:
-            await message.reply("❌ ID должен быть числом")
+            await message.reply(t(lang, "admin_invalid_id"))
             return
         
         await grant_access(uid)
         USER_STATES.pop(message.from_user.id, None)
-        await message.reply(f"✅ Доступ выдан: {uid}")
+        await message.reply(t(lang, "admin_access_granted", uid=uid))
         
         from aiogram import Bot
         bot = Bot.get_current()
         try:
-            await bot.send_message(uid, "🎉 Доступ активирован!\n\nНажми /start")
+            await bot.send_message(uid, t(lang, "access_granted"))
         except:
             pass
     
@@ -617,37 +619,47 @@ def setup_handlers(dp):
     async def adm_give(call: types.CallbackQuery):
         if not is_admin(call.from_user.id):
             return
+        
+        lang = await get_user_lang(call.from_user.id)
         USER_STATES[call.from_user.id] = {"mode": "admin_give_uid"}
+        
         try:
-            await call.message.edit_text("💰 Отправь ID пользователя", reply_markup=admin_kb())
+            await call.message.edit_text(t(lang, "admin_send_user_id"), reply_markup=admin_kb(lang))
         except:
-            await call.message.answer("💰 Отправь ID пользователя", reply_markup=admin_kb())
+            await call.message.answer(t(lang, "admin_send_user_id"), reply_markup=admin_kb(lang))
         await call.answer()
     
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "admin_give_uid")
     async def handle_give_uid(message: types.Message):
         if not is_admin(message.from_user.id):
             return
+        
+        lang = await get_user_lang(message.from_user.id)
+        
         try:
             uid = int(message.text.strip())
         except:
-            await message.reply("❌ ID должен быть числом")
+            await message.reply(t(lang, "admin_invalid_id"))
             return
+        
         USER_STATES[message.from_user.id] = {"mode": "admin_give_amount", "target_id": uid}
-        await message.reply("Отправь сумму")
+        await message.reply(t(lang, "admin_send_amount"))
     
     @dp.message_handler(lambda m: USER_STATES.get(m.from_user.id, {}).get("mode") == "admin_give_amount")
     async def handle_give_amount(message: types.Message):
         if not is_admin(message.from_user.id):
             return
+        
+        lang = await get_user_lang(message.from_user.id)
+        
         try:
             amount = float(message.text.strip())
         except:
-            await message.reply("❌ Сумма должна быть числом")
+            await message.reply(t(lang, "withdraw_invalid_amount"))
             return
         
         uid = USER_STATES[message.from_user.id]["target_id"]
         await add_balance(uid, amount)
         
         USER_STATES.pop(message.from_user.id, None)
-        await message.reply(f"✅ Начислено ${amount:.2f} → {uid}")
+        await message.reply(t(lang, "admin_balance_added", amount=amount, uid=uid))
