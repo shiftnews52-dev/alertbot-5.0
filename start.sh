@@ -1,79 +1,83 @@
 #!/bin/bash
-# Alpha Entry Bot - Quick Start Script
+# Alpha Entry Bot - Start script for Render
+# С автоматическим импортом исторических данных
 
-# Цвета для вывода
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+set -e  # Остановка при ошибке
 
-echo "🚀 Alpha Entry Bot - Quick Start"
-echo "================================"
+echo "============================================================"
+echo "🚀 Alpha Entry Bot - Starting on Render"
+echo "============================================================"
+echo ""
 
-# Проверка Python
-if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}❌ Python 3 не установлен${NC}"
-    echo "Установите Python 3.8+: https://www.python.org/downloads/"
-    exit 1
-fi
+# ==================== ПРОВЕРКИ ====================
+echo "🔍 Pre-flight checks..."
+echo ""
 
-echo -e "${GREEN}✅ Python найден:${NC} $(python3 --version)"
+# Python версия
+echo "🐍 Python version:"
+python --version
+echo ""
 
-# Проверка .env файла
-if [ ! -f .env ]; then
-    echo -e "${YELLOW}⚠️  Файл .env не найден${NC}"
-    echo "Создаём .env из примера..."
-    
-    if [ -f .env.example ]; then
-        cp .env.example .env
-        echo -e "${YELLOW}📝 Отредактируй .env и добавь BOT_TOKEN и ADMIN_IDS${NC}"
-        exit 1
-    else
-        echo -e "${RED}❌ Файл .env.example не найден${NC}"
-        exit 1
-    fi
-fi
-
-# Проверка переменных
-source .env
-
+# Переменные окружения
 if [ -z "$BOT_TOKEN" ]; then
-    echo -e "${RED}❌ BOT_TOKEN не указан в .env${NC}"
+    echo "❌ ERROR: BOT_TOKEN not set!"
+    echo "   Go to Render Dashboard → Environment → Add BOT_TOKEN"
     exit 1
 fi
 
 if [ -z "$ADMIN_IDS" ]; then
-    echo -e "${RED}❌ ADMIN_IDS не указан в .env${NC}"
+    echo "❌ ERROR: ADMIN_IDS not set!"
+    echo "   Go to Render Dashboard → Environment → Add ADMIN_IDS"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Конфигурация найдена${NC}"
+echo "✅ BOT_TOKEN: Set"
+echo "✅ ADMIN_IDS: Set"
 
-# Создание виртуального окружения
-if [ ! -d "venv" ]; then
-    echo "📦 Создаём виртуальное окружение..."
-    python3 -m venv venv
+# Таймфрейм (по умолчанию 1h)
+TIMEFRAME=${TIMEFRAME:-1h}
+echo "✅ TIMEFRAME: ${TIMEFRAME}"
+echo ""
+
+# ==================== ИМПОРТ ИСТОРИИ ====================
+echo "============================================================"
+echo "📥 Importing historical data (${TIMEFRAME} timeframe)"
+echo "============================================================"
+echo ""
+
+# Проверяем наличие скрипта
+if [ -f "import_history_tf.py" ]; then
+    echo "📊 Importing 300 candles for default pairs..."
+    
+    # Импорт с обработкой ошибок
+    if python import_history_tf.py all ${TIMEFRAME} 300; then
+        echo ""
+        echo "✅ Historical data imported successfully!"
+    else
+        echo ""
+        echo "⚠️  Warning: Import failed, but continuing..."
+        echo "   Bot will work but needs time to collect data"
+        echo "   (~4 hours for 1h timeframe)"
+    fi
+else
+    echo "⚠️  Warning: import_history_tf.py not found"
+    echo "   Bot will start but needs time to collect data"
 fi
 
-# Активация виртуального окружения
-source venv/bin/activate
+echo ""
 
-# Установка зависимостей
-echo "📦 Устанавливаем зависимости..."
-pip install -q -r requirements.txt
+# ==================== ЗАПУСК БОТА ====================
+echo "============================================================"
+echo "🤖 Starting main bot..."
+echo "============================================================"
+echo ""
 
-echo -e "${GREEN}✅ Зависимости установлены${NC}"
-
-# Экспорт переменных
+# Экспорт переменных (на случай если нужно)
 export BOT_TOKEN
 export ADMIN_IDS
-export SUPPORT_URL
-export BOT_NAME
+export TIMEFRAME
+export SUPPORT_URL=${SUPPORT_URL:-https://t.me/support}
+export BOT_NAME=${BOT_NAME:-Alpha Entry Bot}
 
-# Запуск бота
-echo ""
-echo -e "${GREEN}🤖 Запускаем бота...${NC}"
-echo -e "${YELLOW}Нажми Ctrl+C для остановки${NC}"
-echo ""
-
-python3 main.py
+# Запуск
+python main.py
